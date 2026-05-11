@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Applybot</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0e0e10;--surface:#16161a;--surface2:#1e1e24;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
+  --text:#f0ede8;--muted:#8a8794;--accent:#c8f564;--accent-dim:#a8d44a;
+  --danger:#f56464;--radius:14px;--radius-sm:8px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);
+     min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:36px 16px}
+header{text-align:center;margin-bottom:32px}
+.logo{font-family:'DM Serif Display',serif;font-size:38px;letter-spacing:-1px}
+.logo span{color:var(--accent);font-style:italic}
+header p{color:var(--muted);font-size:13px;margin-top:4px;font-weight:300}
+
+/* Progress */
+.pw{width:100%;max-width:700px;margin-bottom:24px}
+.ps{display:flex;align-items:center}
+.sd{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;cursor:pointer}
+.sd .c{width:28px;height:28px;border-radius:50%;border:2px solid var(--border2);background:var(--surface);
+       display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;
+       color:var(--muted);transition:all .2s;z-index:1}
+.sd .lb{font-size:10px;color:var(--muted);text-align:center;white-space:nowrap}
+.sl{height:2px;flex:1;background:var(--border2);margin-bottom:14px;transition:background .3s}
+.sd.active .c{border-color:var(--accent);color:var(--bg);background:var(--accent)}
+.sd.done .c{border-color:var(--accent);background:var(--accent);color:var(--bg)}
+.sd.active .lb,.sd.done .lb{color:var(--text)}
+.sl.done{background:var(--accent)}
+
+/* Card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+      padding:28px;width:100%;max-width:700px;animation:fu .25s ease}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.ct{font-family:'DM Serif Display',serif;font-size:19px;font-weight:400;margin-bottom:2px}
+.cs{font-size:12px;color:var(--muted);margin-bottom:20px;font-weight:300}
+
+/* Grid / fields */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.full{grid-column:1/-1}
+.fi{display:flex;flex-direction:column;gap:4px}
+label{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:.05em;text-transform:uppercase}
+input,select,textarea{background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);color:var(--text);font-family:'DM Sans',sans-serif;
+  font-size:13px;padding:8px 11px;outline:none;transition:border-color .15s;width:100%}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.5}
+input:focus,select:focus{border-color:var(--accent)}
+select{cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a8794' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center}
+select option{background:var(--surface2)}
+
+.sec{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+     border-bottom:1px solid var(--border);padding-bottom:6px;margin:20px 0 12px}
+.sec:first-child{margin-top:0}
+
+/* Toggle */
+.tr{display:flex;align-items:center;justify-content:space-between;padding:7px 0}
+.tr .inf span:first-child{font-size:12px;color:var(--text)}
+.tr .inf span:last-child{font-size:11px;color:var(--muted)}
+.tgl{position:relative;width:36px;height:20px;flex-shrink:0}
+.tgl input{opacity:0;width:0;height:0}
+.tgl .tk{position:absolute;inset:0;background:var(--border2);border-radius:100px;cursor:pointer;transition:.2s}
+.tgl .tk::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;
+  border-radius:50%;background:var(--muted);transition:.2s}
+.tgl input:checked+.tk{background:var(--accent)}
+.tgl input:checked+.tk::after{transform:translateX(16px);background:var(--bg)}
+
+/* Radio chips */
+.rg{display:flex;flex-wrap:wrap;gap:6px}
+.rc input{display:none}
+.rc span{font-size:11px;color:var(--muted);padding:5px 12px;border:1px solid var(--border2);
+          border-radius:100px;cursor:pointer;transition:all .15s;display:block;
+          font-weight:400;letter-spacing:0;text-transform:none}
+.rc input:checked+span  {border-color:var(--accent);color:var(--bg);background:var(--accent)}
+
+/* Mode selector */
+.mode-tabs{display:flex;gap:8px;margin-bottom:16px}
+.mode-tab{flex:1;padding:10px;border:1px solid var(--border2);border-radius:var(--radius-sm);
+          cursor:pointer;text-align:center;transition:all .15s;background:transparent}
+.mode-tab .mt{font-size:13px;font-weight:500;color:var(--muted)}
+.mode-tab .ms{font-size:11px;color:var(--muted);margin-top:2px}
+.mode-tab.active{border-color:var(--accent);background:rgba(200,245,100,.07)}
+.mode-tab.active .mt{color:var(--accent)}
+.mode-tab.active .ms{color:var(--text)}
+
+/* Skill table */
+.stbl{width:100%;border-collapse:collapse}
+.stbl th{text-align:left;font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+         color:var(--muted);padding:0 0 7px;border-bottom:1px solid var(--border)}
+.stbl td{padding:5px 0;border-bottom:1px solid var(--border);vertical-align:middle}
+.stbl td:first-child{font-size:12px;color:var(--text);padding-right:8px}
+.stbl input[type=number]{width:68px;text-align:center;padding:4px 7px;font-size:12px}
+.skdot{display:inline-block;width:6px;height:6px;border-radius:50%;
+       background:var(--accent);opacity:.5;margin-right:6px;vertical-align:middle}
+
+/* Saved profiles */
+.sp-panel{background:var(--surface2);border:1px solid var(--border);
+          border-radius:var(--radius-sm);padding:12px;margin-bottom:16px}
+.sp-panel .sph{font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:8px}
+.pc{display:flex;align-items:center;justify-content:space-between;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;
+    margin-bottom:5px}
+.pc .pn{font-size:12px;font-weight:500}
+.pc .pe{font-size:11px;color:var(--muted);margin-top:1px}
+.pc .lb{font-size:11px;color:var(--accent);border:1px solid var(--accent);border-radius:4px;
+        padding:2px 8px;cursor:pointer;background:none;font-family:'DM Sans',sans-serif}
+.np{font-size:11px;color:var(--muted);text-align:center;padding:8px 0}
+
+/* Buttons */
+.br{display:flex;gap:8px;margin-top:20px}
+.bb{padding:9px 18px;font-size:12px;font-weight:500;border:1px solid var(--border2);
+    border-radius:var(--radius-sm);background:transparent;color:var(--muted);
+    cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.bb:hover{color:var(--text);border-color:var(--text)}
+.bn{flex:1;padding:10px 18px;font-size:13px;font-weight:500;border:none;
+    border-radius:var(--radius-sm);background:var(--accent);color:var(--bg);
+    cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;
+    display:flex;align-items:center;justify-content:center;gap:6px}
+.bn:hover{background:var(--accent-dim)}
+.bn:active{transform:scale(.98)}
+
+/* Summary */
+.sr{display:flex;justify-content:space-between;align-items:baseline;
+    padding:6px 0;border-bottom:1px solid var(--border)}
+.sr .sk{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.sr .sv{font-size:12px;color:var(--text);text-align:right;max-width:58%}
+
+/* Status */
+.ss{font-size:12px;color:var(--muted);margin-top:8px;text-align:center}
+.ss.run{color:var(--accent)}.ss.err{color:var(--danger)}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--bg);
+      border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.hidden{display:none!important}
+@media(max-width:520px){.g2,.g3{grid-template-columns:1fr}.card{padding:18px 14px}.logo{font-size:28px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Apply<span>bot</span></div>
+  <p>Naukri auto-apply — multi-account · recommended jobs · saved profiles</p>
+</header>
+
+<!-- Progress -->
+<div class="pw">
+  <div class="ps">
+    <div class="sd active" id="dot-1" onclick="goTo(1)"><div class="c">1</div><div class="lb">Account</div></div>
+    <div class="sl" id="ln-1"></div>
+    <div class="sd" id="dot-2" onclick="goTo(2)"><div class="c">2</div><div class="lb">Search</div></div>
+    <div class="sl" id="ln-2"></div>
+    <div class="sd" id="dot-3" onclick="goTo(3)"><div class="c">3</div><div class="lb">Profile</div></div>
+    <div class="sl" id="ln-3"></div>
+    <div class="sd" id="dot-4" onclick="goTo(4)"><div class="c">4</div><div class="lb">Skills</div></div>
+    <div class="sl" id="ln-4"></div>
+    <div class="sd" id="dot-5" onclick="goTo(5)"><div class="c">5</div><div class="lb">Launch</div></div>
+  </div>
+</div>
+
+<!-- ═══ STEP 1 — Account ═══ -->
+<div class="card" id="step-1">
+  <div class="ct">Naukri account</div>
+  <div class="cs">Pick a saved account or enter new credentials.</div>
+
+  <div class="sp-panel">
+    <div class="sph">Saved accounts</div>
+    <div id="saved-list"><div class="np">No saved accounts yet.</div></div>
+  </div>
+
+  <div class="g2">
+    <div class="fi full"><label>Email address</label><input type="email" id="naukri_email" placeholder="you@example.com"></div>
+    <div class="fi full"><label>Password</label><input type="password" id="naukri_password" placeholder="••••••••"></div>
+  </div>
+
+  <div class="br">
+    <button class="bn" onclick="next(1)">Continue <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>  
+</div>
+
+<!-- ═══ STEP 2 — Search ═══ -->
+<div class="card hidden" id="step-2">
+  <div class="ct">Job search</div>
+  <div class="cs">Choose how Applybot finds jobs.</div>
+
+  <!-- Mode selector -->
+  <div class="mode-tabs">
+    <div class="mode-tab active" id="mode-search" onclick="setMode('search')">
+      <div class="mt">Search by role</div>
+      <div class="ms">Build URL from role + location</div>
+    </div>
+    <div class="mode-tab" id="mode-url" onclick="setMode('url')">
+      <div class="mt">Custom URL</div>
+      <div class="ms">Paste your own Naukri search URL</div>
+    </div>
+    <div class="mode-tab" id="mode-rec" onclick="setMode('rec')">
+      <div class="mt">Recommended</div>
+      <div class="ms">Apply to your recommended feed</div>
+    </div>
+  </div>
+
+  <!-- Search fields -->
+  <div id="sf-search">
+    <div class="g2">
+      <div class="fi"><label>Job title / role</label><input type="text" id="role" placeholder="java-developer-spring-boot"></div>
+      <div class="fi"><label>Location</label><input type="text" id="location" placeholder="Chennai"></div>
+      <div class="fi"><label>Experience (years)</label><input type="number" id="exp" placeholder="0" min="0" max="30" value="0"></div>
+      <div class="fi"><label>Max pages</label><input type="number" id="max_pages" placeholder="5" min="1" max="50" value="5"></div>
+    </div>
+    <div class="tr">
+      <div class="inf"><span>Work from home</span></div>
+      <label class="tgl"><input type="checkbox" id="wfh"><div class="tk"></div></label>
+    </div>
+    <div class="tr">
+      <div class="inf"><span>Also apply to recommended jobs</span><span>Processes recommended feed after search finishes</span></div>
+      <label class="tgl"><input type="checkbox" id="include_recommended"><div class="tk"></div></label>
+    </div>
+  </div>
+
+  <!-- Custom URL -->
+  <div id="sf-url" class="hidden">
+    <div class="fi">
+      <label>Naukri search URL</label>
+      <input type="url" id="custom_url" placeholder="https://www.naukri.com/java-developer-jobs-in-chennai?experience=0">
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:6px">Paste any Naukri search/filter URL. The bot will paginate through it automatically.</p>
+    <div class="fi" style="margin-top:10px">
+      <label>Max pages</label>
+      <input type="number" id="max_pages_url" placeholder="5" min="1" max="50" value="5">
+    </div>
+  </div>
+
+  <!-- Recommended -->
+  <div id="sf-rec" class="hidden">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px">
+      <p style="font-size:13px;color:var(--text)">Will apply to: <strong style="color:var(--accent)">naukri.com/recommendedjobs</strong></p>
+      <p style="font-size:11px;color:var(--muted);margin-top:4px">Naukri shows personalized job recommendations based on your profile. The bot scrolls the full page to load all cards before applying.</p>
+    </div>
+  </div>
+
+  <div class="br">
+    <button class="bb" onclick="prev(2)">Back</button>
+    <button class="bn" onclick="next(2)">Continue <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+</div>
+
+<!-- ═══ STEP 3 — Profile ═══ -->
+<div class="card hidden" id="step-3">
+  <div class="ct">Personal profile</div>
+  <div class="cs">Used to answer chatbot questions automatically.</div>
+
+  <p class="sec">Identity</p>
+  <div class="g2">
+    <div class="fi"><label>Full name</label><input type="text" id="p_name" placeholder="name"></div>
+    <div class="fi"><label>Date of birth (DD/MM/YYYY)</label><input type="text" id="p_dob" placeholder="02/04/2000"></div>
+    <div class="fi"><label>Gender</label>
+      <select id="p_gender"><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>
+    </div>
+    <div class="fi"><label>Nationality</label><input type="text" id="p_nationality" value="Indian"></div>
+  </div>
+
+  <p class="sec">Contact</p>
+  <div class="g2">
+    <div class="fi"><label>Email (for chatbot answers)</label><input type="email" id="p_email" placeholder="you@example.com"></div>
+    <div class="fi"><label>Phone</label><input type="tel" id="p_phone" placeholder="9876543210"></div>
+    <div class="fi"><label>Current city</label><input type="text" id="p_city" placeholder="Chennai"></div>
+    <div class="fi"><label>Preferred location</label><input type="text" id="p_pref_location" placeholder="Chennai"></div>
+  </div>
+
+  <p class="sec">Employment</p>
+  <div class="g2">
+    <div class="fi"><label>Current company</label><input type="text" id="p_company" placeholder="Fresher"></div>
+    <div class="fi"><label>Designation</label><input type="text" id="p_designation" placeholder="Fresher"></div>
+    <div class="fi"><label>Current CTC (Lacs)</label><input type="number" id="p_current_ctc" value="0" step="0.5" min="0"></div>
+    <div class="fi"><label>Expected CTC (Lacs)</label><input type="number" id="p_expected_ctc" placeholder="5" step="0.5" min="0"></div>
+  </div>
+
+  <p class="sec">Notice period</p>
+  <!-- <div class="rg">
+    <label class="rc"><input type="radio" name="notice" value="Immediately"><label>Immediately</label></label>
+    <label class="rc"><input type="radio" name="notice" value="15 days"><label>15 days</label></label>
+    <label class="rc"><input type="radio" name="notice" value="30 days" checked><label>30 days</label></label>
+    <label class="rc"><input type="radio" name="notice" value="45 days"><label>45 days</label></label>
+    <label class="rc"><input type="radio" name="notice" value="60 days"><label>60 days</label></label>
+    <label class="rc"><input type="radio" name="notice" value="More than 3 Months"><label>&gt; 3 months</label></label>
+  </div> -->
+   <div class="rg">
+  <label class="rc">
+    <input type="radio" name="notice" value="Immediately">
+    <span>Immediately</span>
+  </label>
+
+  <label class="rc">
+    <input type="radio" name="notice" value="15 days">
+    <span>15 days</span>
+  </label>
+
+  <label class="rc">
+    <input type="radio" name="notice" value="30 days" checked>
+    <span>30 days</span>
+  </label>
+
+  <label class="rc">
+    <input type="radio" name="notice" value="45 days">
+    <span>45 days</span>
+  </label>
+
+  <label class="rc">
+    <input type="radio" name="notice" value="60 days">
+    <span>60 days</span>
+  </label>
+
+  <label class="rc">
+    <input type="radio" name="notice" value="More than 3 Months">
+    <span>&gt; 3 months</span>
+  </label>
+</div>
+
+  <p class="sec">Education</p>
+  <div class="g2">
+    <div class="fi"><label>Degree</label><input type="text" id="p_degree" value="B.Tech"></div>
+    <div class="fi"><label>Specialization</label><input type="text" id="p_spec" placeholder="Computer Science"></div>
+    <div class="fi"><label>College / University</label><input type="text" id="p_college" placeholder="Anna University"></div>
+    <div class="fi"><label>Year of passout</label><input type="number" id="p_passout" placeholder="2024" min="1990" max="2030"></div>
+    <div class="fi"><label>CGPA</label><input type="number" id="p_cgpa" placeholder="8.0" step="0.1" min="0" max="10"></div>
+    <div class="fi"><label>Percentage %</label><input type="number" id="p_percent" placeholder="80" min="0" max="100"></div>
+  </div>
+
+  <p class="sec">Preferences</p>
+  <div class="tr"><div class="inf"><span>Willing to relocate</span></div><label class="tgl"><input type="checkbox" id="p_relocate" checked><div class="tk"></div></label></div>
+  <div class="tr"><div class="inf"><span>Open to night / rotational shifts</span></div><label class="tgl"><input type="checkbox" id="p_shift" checked><div class="tk"></div></label></div>
+  <div class="tr"><div class="inf"><span>Willing to work from office</span></div><label class="tgl"><input type="checkbox" id="p_wfo" checked><div class="tk"></div></label></div>
+  <div class="tr"><div class="inf"><span>Currently on career break</span><span>Bot will answer No to career break questions</span></div><label class="tgl"><input type="checkbox" id="p_career_break"><div class="tk"></div></label></div>
+  <div class="tr"><div class="inf"><span>Currently employed</span></div><label class="tgl"><input type="checkbox" id="p_employed"><div class="tk"></div></label></div>
+
+  <div class="br">
+    <button class="bb" onclick="prev(3)">Back</button>
+    <button class="bn" onclick="next(3)">Continue <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+</div>
+
+<!-- ═══ STEP 4 — Skills ═══ -->
+<div class="card hidden" id="step-4">
+  <div class="ct">Skill experience</div>
+  <div class="cs">Enter years of experience per technology. 0 = fresher / not used.</div>
+
+  <p class="sec">Java & Spring</p>
+  <table class="stbl"><thead><tr><th>Skill</th><th style="width:80px">Years</th></tr></thead><tbody id="sb1"></tbody></table>
+
+  <p class="sec">Databases & Cloud</p>
+  <table class="stbl"><thead><tr><th>Skill</th><th style="width:80px">Years</th></tr></thead><tbody id="sb2"></tbody></table>
+
+  <p class="sec">Frontend, Testing & Other</p>
+  <table class="stbl"><thead><tr><th>Skill</th><th style="width:80px">Years</th></tr></thead><tbody id="sb3"></tbody></table>
+
+  <div class="br">
+    <button class="bb" onclick="prev(4)">Back</button>
+    <button class="bn" onclick="next(4)">Review & Launch <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+</div>
+
+<!-- ═══ STEP 5 — Launch ═══ -->
+<div class="card hidden" id="step-5">
+  <div class="ct">Ready to launch</div>
+  <div class="cs">Review your settings — profile saves automatically on launch.</div>
+  <div id="summary" style="display:flex;flex-direction:column;margin-bottom:16px"></div>
+  <div style="text-align:center">
+    <button class="bn" id="lbtn" onclick="launch()" style="width:100%;font-size:14px;padding:12px">
+      <span id="llbl">Start Applybot</span>
+      <span id="lspin" class="spin hidden"></span>
+    </button>
+    <div class="ss" id="sts"></div>
+  </div>
+  <div class="br" style="margin-top:12px">
+    <button class="bb" onclick="prev(5)" style="width:100%">← Edit settings</button>
+  </div>
+</div>
+
+<script>
+// ── Skill groups ──────────────────────────────────────────────────────────────
+const SG = {
+  1: ["java","java developer","spring boot","spring","spring mvc","spring security",
+      "spring cloud","hibernate","jpa","jdbc","microservices","rest api",
+      "mvc framework","maven","gradle","junit","mockito","testng"],
+  2: ["sql","mysql","postgresql","oracle","mongodb","redis","kafka","rabbitmq",
+      "docker","kubernetes","jenkins","aws","azure","gcp","linux","git"],
+  3: ["react","angular","javascript","typescript","node","html","css","python",
+      "django","flask","selenium","t24","sap","machine learning","android",
+      ".net","php","ruby","scala","graphql"]
+};
+
+// Build skill tables
+[1,2,3].forEach(g => {
+  const tb = document.getElementById('sb'+g);
+  SG[g].forEach(sk => {
+    const id = 'sk_'+sk.replace(/[^a-z0-9]/g,'_');
+    tb.innerHTML += `<tr><td><span class="skdot"></span>${sk.charAt(0).toUpperCase()+sk.slice(1)}</td>
+      <td><input type="number" id="${id}" min="0" max="30" step="0.5" value="0"></td></tr>`;
+  });
+});
+
+// ── Mode selector ─────────────────────────────────────────────────────────────
+let currentMode = 'search';
+function setMode(m) {
+  currentMode = m;
+  ['search','url','rec'].forEach(x => {
+    document.getElementById('mode-'+x).classList.toggle('active', x===m);
+    document.getElementById('sf-'+x).classList.toggle('hidden', x!==m);
+  });
+}
+
+// ── Saved profiles (localStorage) ────────────────────────────────────────────
+let saved = JSON.parse(localStorage.getItem('ab_profiles')||'[]');
+
+function renderSaved() {
+  const el = document.getElementById('saved-list');
+  if (!saved.length) { el.innerHTML='<div class="np">No saved accounts yet.</div>'; return; }
+  el.innerHTML = saved.map((p,i)=>`
+    <div class="pc">
+      <div><div class="pn">${p.fullName||p.naukriEmail}</div>
+           <div class="pe">${p.naukriEmail}</div></div>
+      <button class="lb" onclick="loadP(${i})">Load</button>
+    </div>`).join('');
+}
+
+function loadP(i) {
+  const p = saved[i];
+  sv('naukri_email',   p.naukriEmail||'');
+  sv('naukri_password',p.naukriPassword||'');
+  sv('p_name',         p.fullName||'');
+  sv('p_dob',          p.dob||'');
+  sv('p_nationality',  p.nationality||'Indian');
+  sv('p_email',        p.email||'');
+  sv('p_phone',        p.phone||'');
+  sv('p_city',         p.city||'');
+  sv('p_pref_location',p.preferredLocation||'');
+  sv('p_company',      p.company||'');
+  sv('p_designation',  p.designation||'');
+  sv('p_current_ctc',  p.currentCtc||0);
+  sv('p_expected_ctc', p.expectedCtc||5);
+  sv('p_degree',       p.degree||'B.Tech');
+  sv('p_spec',         p.specialization||'');
+  sv('p_college',      p.college||'');
+  sv('p_passout',      p.passoutYear||'');
+  sv('p_cgpa',         p.cgpa||'');
+  sv('p_percent',      p.percentage||'');
+  sc('p_relocate',     p.relocate);
+  sc('p_shift',        p.shift);
+  sc('p_wfo',          p.wfo);
+  sc('p_career_break', p.careerBreak);
+  sc('p_employed',     p.employed);
+  if (p.gender) document.getElementById('p_gender').value = p.gender;
+  if (p.notice) { const r=document.querySelector(`input[name="notice"][value="${p.notice}"]`); if(r) r.checked=true; }
+  if (p.skillExperience) {
+    Object.entries(p.skillExperience).forEach(([sk,yr])=>{
+      const el=document.getElementById('sk_'+sk.replace(/[^a-z0-9]/g,'_'));
+      if (el) el.value=yr;
+    });
+  }
+  alert('✓ Loaded: '+(p.fullName||p.naukriEmail));
+}
+
+function sv(id,v){ const el=document.getElementById(id); if(el&&v!==undefined) el.value=v; }
+function sc(id,v){ const el=document.getElementById(id); if(el) el.checked=!!v; }
+renderSaved();
+
+// ── Navigation ────────────────────────────────────────────────────────────────
+let cur = 1;
+function goTo(n){ if(n<cur) show(n); }
+function next(f){ if(!validate(f)) return; show(f+1); if(f+1===5) buildSum(); }
+function prev(f){ show(f-1); }
+function show(n){
+  document.getElementById('step-'+cur).classList.add('hidden');
+  cur=n;
+  document.getElementById('step-'+n).classList.remove('hidden');
+  for(let i=1;i<=5;i++){
+    const d=document.getElementById('dot-'+i), l=document.getElementById('ln-'+i);
+    d.classList.remove('active','done');
+    if(l) l.classList.remove('done');
+    if(i<cur){d.classList.add('done');if(l)l.classList.add('done');}
+    if(i===cur) d.classList.add('active');
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── Validation ────────────────────────────────────────────────────────────────
+function validate(s){
+  if(s===1 && (!gv('naukri_email')||!gv('naukri_password'))){ alert('Enter email and password.'); return false; }
+  if(s===2){
+    if(currentMode==='search' && (!gv('role')||!gv('location'))){ alert('Enter job role and location.'); return false; }
+    if(currentMode==='url' && !gv('custom_url')){ alert('Enter a Naukri search URL.'); return false; }
+  }
+  if(s===3 && (!gv('p_name')||!gv('p_email')||!gv('p_phone'))){ alert('Fill in name, email and phone.'); return false; }
+  return true;
+}
+function gv(id){ return (document.getElementById(id)?.value||'').trim(); }
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+function buildSum(){
+  const notice = document.querySelector('input[name="notice"]:checked')?.value||'30 days';
+  const modeLabel = currentMode==='rec'?'Recommended jobs only'
+    : currentMode==='url'?('Custom URL · '+(gv('max_pages_url')||5)+' pages')
+    : ((gv('role')||'—')+' · '+(gv('location')||'—')+' · '+(gv('exp')||0)+'y · '+(gv('max_pages')||5)+' pages');
+  const rows=[
+    ['Account',  gv('naukri_email')],
+    ['Job mode', modeLabel],
+    ['Name',     gv('p_name')],
+    ['CTC',      'Current: '+(gv('p_current_ctc')||'0')+' L → Expected: '+(gv('p_expected_ctc')||'5')+' L'],
+    ['Notice',   notice],
+    ['Education',(gv('p_degree')||'B.Tech')+' · '+(gv('p_passout')||'—')],
+    ['Relocate', document.getElementById('p_relocate').checked?'Yes':'No'],
+  ];
+  const topSkills=Object.values(SG).flat()
+    .map(s=>({n:s,y:parseFloat(document.getElementById('sk_'+s.replace(/[^a-z0-9]/g,'_'))?.value||0)}))
+    .filter(x=>x.y>0).sort((a,b)=>b.y-a.y).slice(0,5)
+    .map(x=>x.n+' ('+x.y+'y)').join(', ');
+  if(topSkills) rows.push(['Top skills',topSkills]);
+  document.getElementById('summary').innerHTML=rows.map(([k,v])=>
+    `<div class="sr"><span class="sk">${k}</span><span class="sv">${v||'—'}</span></div>`).join('');
+}
+
+// ── Collect & launch ──────────────────────────────────────────────────────────
+function collectPayload(){
+  const notice=document.querySelector('input[name="notice"]:checked')?.value||'30 days';
+  const skills={};
+  Object.values(SG).flat().forEach(sk=>{
+    const id='sk_'+sk.replace(/[^a-z0-9]/g,'_');
+    skills[sk]=parseFloat(document.getElementById(id)?.value||0);
+  });
+  return {
+    naukriEmail:   gv('naukri_email'),
+    naukriPassword:gv('naukri_password'),
+    role:          gv('role'),
+    location:      gv('location'),
+    exp:           gv('exp')||'0',
+    wfh:           document.getElementById('wfh').checked,
+    maxPages:      parseInt(gv(currentMode==='url'?'max_pages_url':'max_pages')||'5'),
+    customUrl:     gv('custom_url'),
+    recommendedOnly:    currentMode==='rec',
+    includeRecommended: document.getElementById('include_recommended').checked,
+    fullName:      gv('p_name'),
+    dob:           gv('p_dob'),
+    gender:        document.getElementById('p_gender').value,
+    nationality:   gv('p_nationality')||'Indian',
+    email:         gv('p_email'),
+    phone:         gv('p_phone'),
+    city:          gv('p_city'),
+    preferredLocation: gv('p_pref_location'),
+    company:       gv('p_company')||'Fresher',
+    designation:   gv('p_designation')||'Fresher',
+    currentCtc:    parseFloat(gv('p_current_ctc')||'0'),
+    expectedCtc:   parseFloat(gv('p_expected_ctc')||'5'),
+    notice,
+    degree:        gv('p_degree')||'B.Tech',
+    specialization:gv('p_spec'),
+    college:       gv('p_college'),
+    passoutYear:   gv('p_passout'),
+    cgpa:          gv('p_cgpa'),
+    percentage:    gv('p_percent'),
+    relocate:      document.getElementById('p_relocate').checked,
+    shift:         document.getElementById('p_shift').checked,
+    wfo:           document.getElementById('p_wfo').checked,
+    careerBreak:   document.getElementById('p_career_break').checked,
+    employed:      document.getElementById('p_employed').checked,
+    skillExperience: skills
+  };
+}
+
+function launch(){
+  const btn=document.getElementById('lbtn');
+  const lbl=document.getElementById('llbl');
+  const sp=document.getElementById('lspin');
+  const sts=document.getElementById('sts');
+  const p=collectPayload();
+
+  // Save locally
+  const idx=saved.findIndex(x=>x.naukriEmail===p.naukriEmail);
+  if(idx>=0) saved[idx]=p; else saved.push(p);
+  localStorage.setItem('ab_profiles',JSON.stringify(saved));
+  renderSaved();
+
+  btn.disabled=true; lbl.textContent='Starting...'; sp.classList.remove('hidden');
+  sts.textContent='Connecting to server...'; sts.className='ss run';
+
+  fetch('http://localhost:8080/start',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(p)})
+  .then(r=>{ if(!r.ok) throw new Error('Server returned '+r.status); return r.text(); })
+  .then(msg=>{
+    lbl.textContent='Running ✓'; sp.classList.add('hidden'); btn.disabled=false;
+    sts.textContent='✓ '+msg; sts.className='ss run';
+  })
+  .catch(err=>{
+    lbl.textContent='Start Applybot'; sp.classList.add('hidden'); btn.disabled=false;
+    sts.textContent='✗ '+err.message+' — is Spring Boot running on :8080?'; sts.className='ss err';
+  });
+}
+</script>
+</body>
+</html>
