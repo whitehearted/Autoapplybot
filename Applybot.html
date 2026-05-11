@@ -80,7 +80,7 @@ select option{background:var(--surface2)}
 .rc span{font-size:11px;color:var(--muted);padding:5px 12px;border:1px solid var(--border2);
           border-radius:100px;cursor:pointer;transition:all .15s;display:block;
           font-weight:400;letter-spacing:0;text-transform:none}
-.rc input:checked+span{border-color:var(--accent);color:var(--bg);background:var(--accent)}
+.rc input:checked+span  {border-color:var(--accent);color:var(--bg);background:var(--accent)}
 
 /* Mode selector */
 .mode-tabs{display:flex;gap:8px;margin-bottom:16px}
@@ -183,7 +183,7 @@ select option{background:var(--surface2)}
 
   <div class="br">
     <button class="bn" onclick="next(1)">Continue <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-  </div>
+  </div>  
 </div>
 
 <!-- ═══ STEP 2 — Search ═══ -->
@@ -259,7 +259,7 @@ select option{background:var(--surface2)}
 
   <p class="sec">Identity</p>
   <div class="g2">
-    <div class="fi"><label>Full name</label><input type="text" id="p_name" placeholder="Manoj Kumar"></div>
+    <div class="fi"><label>Full name</label><input type="text" id="p_name" placeholder="name"></div>
     <div class="fi"><label>Date of birth (DD/MM/YYYY)</label><input type="text" id="p_dob" placeholder="02/04/2000"></div>
     <div class="fi"><label>Gender</label>
       <select id="p_gender"><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>
