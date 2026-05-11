@@ -1,558 +1,3 @@
-//package com.Job.applybot.bot;
-//
-//import com.Job.applybot.Driver.DriverFactory;
-//import org.openqa.selenium.*;
-//import org.openqa.selenium.support.ui.*;
-//import java.time.Duration;
-//import java.util.ArrayList;
-//import java.util.List;
-//
-//public class Bot {
-//
-//    public void searchjob(String url) throws InterruptedException {
-//        WebDriver driver = DriverFactory.GetWebDriver();
-//        login(driver);
-//        driver.get(url);
-//
-//        JavascriptExecutor js = (JavascriptExecutor) driver;
-//        String mainWindow = driver.getWindowHandle();
-//        int page = 1;
-//
-//        while (true) {
-//            System.out.println("===== PAGE " + page + " =====");
-//
-//            // Scroll to load all job cards
-//            for (int i = 0; i < 3; i++) {
-//                js.executeScript("window.scrollBy(0,1000)");
-//                Thread.sleep(1000);
-//            }
-//
-//            // Collect all job hrefs before looping to avoid StaleElementReferenceException
-//            List<WebElement> jobEls = driver.findElements(
-//                    By.xpath("//a[contains(@href,'job-listings') and contains(@class,'title')]"));
-//
-//            if (jobEls.isEmpty()) {
-//                System.out.println("No jobs found on page " + page + ".");
-//                break;
-//            }
-//
-//            List<String> hrefs  = new ArrayList<>();
-//            List<String> titles = new ArrayList<>();
-//            for (WebElement el : jobEls) {
-//                try {
-//                    hrefs.add(el.getAttribute("href"));
-//                    titles.add(el.getText().toLowerCase());
-//                } catch (Exception ignored) {}
-//            }
-//            System.out.println("Found " + hrefs.size() + " jobs on page " + page);
-//
-//            // Process each job
-//            for (int i = 0; i < hrefs.size(); i++) {
-//                String title = titles.get(i);
-//                String link  = hrefs.get(i);
-//
-//                if (!(title.contains("java") || title.contains("fresher") || title.contains("software"))) {
-//                    System.out.println("Skipping (title filter): " + title);
-//                    continue;
-//                }
-//
-//                System.out.println("Processing: " + title);
-//
-//                try {
-//                    js.executeScript("window.open(arguments[0], '_blank');", link);
-//                    Thread.sleep(3000);
-//
-//                    List<String> tabs = new ArrayList<>(driver.getWindowHandles());
-//                    driver.switchTo().window(tabs.get(tabs.size() - 1));
-//
-//                    applyjob(driver);
-//
-//                } catch (InvalidArgumentException fatal) {
-//                    System.out.println("FATAL: Session died — stopping bot.");
-//                    return;
-//                } catch (Exception e) {
-//                    System.out.println("Error on [" + title + "]: " + e.getMessage());
-//                } finally {
-//                    // Close all extra tabs, then switch back to main window
-//                    try {
-//                        for (String tab : new ArrayList<>(driver.getWindowHandles())) {
-//                            if (!tab.equals(mainWindow)) {
-//                                driver.switchTo().window(tab);
-//                                driver.close();
-//                            }
-//                        }
-//                        driver.switchTo().window(mainWindow);
-//                    } catch (Exception closeEx) {
-//                        System.out.println("Tab cleanup warning: " + closeEx.getMessage());
-//                        try { driver.switchTo().window(mainWindow); } catch (Exception ignored) {}
-//                    }
-//                    Thread.sleep(1500);
-//                }
-//            }
-//
-//            // ── Pagination ────────────────────────────────────────────────────────
-//            // Naukri uses several pagination patterns — try all of them
-//            if (!goToNextPage(driver, js, page)) {
-//                System.out.println("No more pages.");
-//                break;
-//            }
-//            page++;
-//            Thread.sleep(3000);
-//        }
-//
-//        System.out.println("===== Bot finished =====");
-//    }
-//
-//    /**
-//     * Tries multiple pagination strategies and returns true if navigation succeeded.
-//     *
-//     * Naukri pagination HTML patterns observed:
-//     *   Pattern A: <a class="pagination-btn">2</a>          — text is page number
-//     *   Pattern B: <a data-page="2">2</a>                   — data-page attribute
-//     *   Pattern C: <li class="pagination">...<a>2</a></li>  — inside li.pagination
-//     *   Pattern D: <a class="btn-next">Next</a>             — generic Next button
-//     */
-//    private boolean goToNextPage(WebDriver driver, JavascriptExecutor js, int currentPage) {
-//        int nextPage = currentPage + 1;
-//
-//        // Strategy A: exact text match for next page number (most common)
-//        try {
-//            WebElement btn = driver.findElement(By.xpath(
-//                    "//a[normalize-space(text())='" + nextPage + "']"));
-//            js.executeScript("arguments[0].click();", btn);
-//            System.out.println("Pagination A: clicked page " + nextPage);
-//            return true;
-//        } catch (NoSuchElementException ignored) {}
-//
-//        // Strategy B: data-page attribute
-//        try {
-//            WebElement btn = driver.findElement(By.xpath(
-//                    "//a[@data-page='" + nextPage + "']"));
-//            js.executeScript("arguments[0].click();", btn);
-//            System.out.println("Pagination B (data-page): clicked page " + nextPage);
-//            return true;
-//        } catch (NoSuchElementException ignored) {}
-//
-//        // Strategy C: inside pagination list items
-//        try {
-//            WebElement btn = driver.findElement(By.xpath(
-//                    "//*[contains(@class,'pagination')]//a[normalize-space(text())='" + nextPage + "']"));
-//            js.executeScript("arguments[0].click();", btn);
-//            System.out.println("Pagination C (list): clicked page " + nextPage);
-//            return true;
-//        } catch (NoSuchElementException ignored) {}
-//
-//        // Strategy D: "Next" / ">" button
-//        try {
-//            WebElement btn = driver.findElement(By.xpath(
-//                    "//a[contains(@class,'next') or normalize-space(text())='Next' " +
-//                            "or normalize-space(text())='>' or @aria-label='Next page']"));
-//            js.executeScript("arguments[0].click();", btn);
-//            System.out.println("Pagination D (Next btn): clicked");
-//            return true;
-//        } catch (NoSuchElementException ignored) {}
-//
-//        // Strategy E: span or button with page number
-//        try {
-//            WebElement btn = driver.findElement(By.xpath(
-//                    "//*[self::button or self::span][normalize-space(text())='" + nextPage + "']"));
-//            js.executeScript("arguments[0].click();", btn);
-//            System.out.println("Pagination E (span/button): clicked page " + nextPage);
-//            return true;
-//        } catch (NoSuchElementException ignored) {}
-//
-//        // Debug: log what pagination elements exist
-//        System.out.println("Pagination debug — all page links found:");
-//        List<WebElement> allPageLinks = driver.findElements(By.xpath(
-//                "//*[contains(@class,'pagination') or contains(@class,'page')]//a | " +
-//                        "//a[@data-page]"));
-//        for (WebElement el : allPageLinks) {
-//            System.out.println("  page link: text=[" + el.getText() + "] " +
-//                    "data-page=[" + safeAttr(el,"data-page") + "] class=[" + safeAttr(el,"class") + "]");
-//        }
-//
-//        return false;
-//    }
-//
-//    // ─────────────────────────────────────────────────────────────────────────────
-//    public void applyjob(WebDriver driver) {
-//        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(15));
-//        try {
-//            WebElement btn = wait.until(ExpectedConditions.elementToBeClickable(
-//                    By.xpath("//button[contains(.,'Apply')]")));
-//            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", btn);
-//            System.out.println("Apply clicked.");
-//            Thread.sleep(6000);
-//
-//            boolean isChatBot = !driver.findElements(By.cssSelector(".chatbot_Drawer")).isEmpty();
-//            boolean isPopup   = !driver.findElements(
-//                    By.cssSelector(".apply-layer-container,.question-title")).isEmpty();
-//
-//            if (isChatBot)     { System.out.println("-> ChatBot flow"); ChatBotHandler.handle(driver); }
-//            else if (isPopup)  { System.out.println("-> Popup flow");   PopupHandler.handle(driver);   }
-//            else                 System.out.println("-> Direct apply (no questions).");
-//
-//        } catch (TimeoutException e) {
-//            System.out.println("Apply button not found or already applied.");
-//        } catch (Exception e) {
-//            System.out.println("applyjob error: " + e.getMessage());
-//        }
-//    }
-//
-//    // ─────────────────────────────────────────────────────────────────────────────
-//    private void login(WebDriver driver) throws InterruptedException {
-//        driver.get("https://www.naukri.com/nlogin/login");
-//        Thread.sleep(2000);
-//        driver.findElement(By.id("usernameField")).sendKeys("marimuthu26052000@gmail.com");
-//        driver.findElement(By.id("passwordField")).sendKeys("Mari@1234");
-//        driver.findElement(By.xpath("//button[text()='Login']")).click();
-//        Thread.sleep(4000);
-//        System.out.println("Login done.");
-//    }
-//
-//    private String safeAttr(WebElement el, String attr) {
-//        try { String v = el.getAttribute(attr); return v == null ? "" : v; }
-//        catch (Exception e) { return ""; }
-//    }
-//}
-
-//package com.Job.applybot.bot;
-//
-//import com.Job.applybot.Driver.DriverFactory;
-//import com.Job.applybot.model.ApplicationTracker;
-//import com.Job.applybot.Service.ApplicationResult;
-//import com.Job.applybot.Service.ApplicationResult.Status;
-//import com.Job.applybot.model.UserProfile;
-//import org.openqa.selenium.*;
-//import org.openqa.selenium.support.ui.*;
-//import java.time.Duration;
-//import java.util.ArrayList;
-//import java.util.List;
-//import java.util.Set;
-//
-//public class Bot {
-//
-//    public void searchjob(String url, UserProfile profile) throws InterruptedException {
-//        WebDriver driver = DriverFactory.GetWebDriver();
-//        ApplicationTracker tracker = new ApplicationTracker(profile.getFullName());
-//
-//        login(driver, profile);
-//        driver.get(url);
-//
-//        JavascriptExecutor js = (JavascriptExecutor) driver;
-//        String mainWindow     = driver.getWindowHandle();
-//        int page              = 1;
-//        int maxPages          = profile.getMaxPages() > 0 ? profile.getMaxPages() : 10;
-//
-//        while (page <= maxPages) {
-//            System.out.println("===== PAGE " + page + " =====");
-//            for (int i = 0; i < 3; i++) {
-//                js.executeScript("window.scrollBy(0,1000)");
-//                Thread.sleep(1000);
-//            }
-//
-//            List<WebElement> jobEls = driver.findElements(
-//                    By.xpath("//a[contains(@href,'job-listings') and contains(@class,'title')]"));
-//            if (jobEls.isEmpty()) { System.out.println("No jobs on page " + page); break; }
-//
-//            List<String> hrefs = new ArrayList<>(), titles = new ArrayList<>();
-//            for (WebElement el : jobEls) {
-//                try { hrefs.add(el.getAttribute("href")); titles.add(el.getText().toLowerCase()); }
-//                catch (Exception ignored) {}
-//            }
-//            System.out.println("Found " + hrefs.size() + " jobs on page " + page);
-//
-//            for (int i = 0; i < hrefs.size(); i++) {
-//                String title = titles.get(i);
-//                String link  = hrefs.get(i);
-//
-//                String roleFilter = profile.getRole() != null
-//                        ? profile.getRole().toLowerCase().replace("-", " ") : "java";
-//                if (!matchesRole(title, roleFilter)) {
-//                    System.out.println("Skipping (filter): " + title);
-//                    continue;
-//                }
-//
-//                System.out.println("Processing: " + title);
-//
-//                // ── Check if session is still alive before opening each job ──────
-//                if (!isSessionAlive(driver)) {
-//                    System.out.println("Session lost — stopping bot.");
-//                    tracker.finish();
-//                    return;
-//                }
-//
-//                applyAndTrack(driver, js, mainWindow, title, link, profile, tracker);
-//                Thread.sleep(1500);
-//            }
-//
-//            if (!goToNextPage(driver, js, page)) { System.out.println("No more pages."); break; }
-//            page++; Thread.sleep(3000);
-//        }
-//
-//        tracker.finish();
-//        System.out.println("===== Bot finished — report: " + tracker.getFilePath() + " =====");
-//    }
-//
-//    // ─────────────────────────────────────────────────────────────────────────
-//    // Open one job tab, apply, track result, always return to mainWindow.
-//    // NEVER throws — all errors are caught and logged.
-//    // ─────────────────────────────────────────────────────────────────────────
-//    private void applyAndTrack(WebDriver driver, JavascriptExecutor js,
-//                               String mainWindow, String title, String jobUrl,
-//                               UserProfile profile, ApplicationTracker tracker) {
-//        try {
-//            // Open job in new tab
-//            js.executeScript("window.open(arguments[0], '_blank');", jobUrl);
-//            Thread.sleep(2000);
-//
-//            // Find the new tab handle
-//            String jobTab = null;
-//            for (String h : driver.getWindowHandles()) {
-//                if (!h.equals(mainWindow)) jobTab = h;
-//            }
-//            if (jobTab == null) {
-//                System.out.println("Job tab did not open — skipping: " + title);
-//                tracker.add(new ApplicationResult(profile.getFullName(), title,
-//                        "Unknown", jobUrl, null, Status.SKIPPED, "Tab did not open"));
-//                return;
-//            }
-//
-//            driver.switchTo().window(jobTab);
-//            String company = extractCompany(driver);
-//
-//            ApplicationResult result = doApply(driver, title, company, jobUrl, profile);
-//            tracker.add(result);
-//
-//        } catch (Exception e) {
-//            System.out.println("Error on [" + title + "]: " + e.getMessage());
-//            tracker.add(new ApplicationResult(profile.getFullName(), title,
-//                    "Unknown", jobUrl, null, Status.FAILED,
-//                    e.getClass().getSimpleName() + ": " + truncate(e.getMessage(), 120)));
-//        } finally {
-//            // ── Always clean up extra tabs and return to mainWindow ────────────
-//            safeCleanupTabs(driver, mainWindow);
-//        }
-//    }
-//
-//    // ─────────────────────────────────────────────────────────────────────────
-//    // Core apply — detects all outcomes and returns the correct status.
-//    // ─────────────────────────────────────────────────────────────────────────
-//    private ApplicationResult doApply(WebDriver driver, String title, String company,
-//                                      String jobUrl, UserProfile profile)
-//            throws InterruptedException {
-//
-//        String username = profile.getFullName();
-//
-//        // ── Already applied check ─────────────────────────────────────────────
-//        if (!driver.findElements(By.xpath(
-//                        "//*[contains(text(),'Already Applied') or contains(text(),'already applied')]"))
-//                .isEmpty()) {
-//            System.out.println("Already applied — skipping.");
-//            return new ApplicationResult(username, title, company, jobUrl, null,
-//                    Status.SKIPPED, "Already applied");
-//        }
-//
-//        // ── Find Apply button ─────────────────────────────────────────────────
-//        WebElement applyBtn;
-//        try {
-//            applyBtn = new WebDriverWait(driver, Duration.ofSeconds(15))
-//                    .until(ExpectedConditions.elementToBeClickable(
-//                            By.xpath("//button[contains(.,'Apply')]")));
-//        } catch (TimeoutException e) {
-//            System.out.println("Apply button not found.");
-//            return new ApplicationResult(username, title, company, jobUrl, null,
-//                    Status.SKIPPED, "Apply button not found");
-//        }
-//
-//        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", applyBtn);
-//        System.out.println("Apply clicked.");
-//        Thread.sleep(3000);
-//
-//        // ── Detect same-tab redirect away from Naukri ─────────────────────────
-//        String currentUrl = driver.getCurrentUrl();
-//        if (!currentUrl.contains("naukri.com")) {
-//            System.out.println("Redirected to company site: " + currentUrl);
-//            return new ApplicationResult(username, title, company, jobUrl, currentUrl,
-//                    Status.REDIRECTED, "Redirected: " + currentUrl);
-//        }
-//
-//        // ── Detect external tab opened by Naukri ─────────────────────────────
-//        // Collect ALL handles and check for non-Naukri ones
-//        String externalUrl  = null;
-//        String externalTab  = null;
-//        String jobTabHandle = null;
-//
-//        Set<String> allTabs = driver.getWindowHandles();
-//        for (String handle : allTabs) {
-//            try {
-//                driver.switchTo().window(handle);
-//                String tabUrl = driver.getCurrentUrl();
-//                if (!tabUrl.contains("naukri.com")) {
-//                    externalUrl  = tabUrl;
-//                    externalTab  = handle;
-//                } else {
-//                    jobTabHandle = handle;
-//                }
-//            } catch (Exception ignored) {
-//                // Tab may have closed itself — skip
-//            }
-//        }
-//
-//        if (externalUrl != null && !externalUrl.isBlank()) {
-//            System.out.println("External tab detected: " + externalUrl);
-//
-//            // Safely close the external tab WITHOUT crashing if it is already gone
-//            if (externalTab != null) {
-//                try {
-//                    driver.switchTo().window(externalTab);
-//                    driver.close();
-//                } catch (Exception ignored) {
-//                    // External site already closed the tab — nothing to do
-//                }
-//            }
-//
-//            // Switch back to the job tab (Naukri tab)
-//            if (jobTabHandle != null) {
-//                try { driver.switchTo().window(jobTabHandle); }
-//                catch (Exception ignored) {}
-//            }
-//
-//            return new ApplicationResult(username, title, company, jobUrl, externalUrl,
-//                    Status.REDIRECTED, "External tab: " + externalUrl);
-//        }
-//
-//        // Make sure we are on the job tab
-//        if (jobTabHandle != null) {
-//            try { driver.switchTo().window(jobTabHandle); }
-//            catch (Exception ignored) {}
-//        }
-//
-//        // ── ChatBot / Popup / Direct ──────────────────────────────────────────
-//        boolean isChatBot = !driver.findElements(By.cssSelector(".chatbot_Drawer")).isEmpty();
-//        boolean isPopup   = !driver.findElements(
-//                By.cssSelector(".apply-layer-container,.question-title")).isEmpty();
-//
-//        try {
-//            if (isChatBot) {
-//                System.out.println("-> ChatBot flow");
-//                ChatBotHandler.handle(driver);
-//                return new ApplicationResult(username, title, company, jobUrl, null,
-//                        Status.SUCCESS, "ChatBot answered");
-//            } else if (isPopup) {
-//                System.out.println("-> Popup flow");
-//                PopupHandler.handle(driver);
-//                return new ApplicationResult(username, title, company, jobUrl, null,
-//                        Status.SUCCESS, "Popup answered");
-//            } else {
-//                System.out.println("-> Direct apply");
-//                return new ApplicationResult(username, title, company, jobUrl, null,
-//                        Status.DIRECT_APPLY, "No questions asked");
-//            }
-//        } catch (Exception e) {
-//            System.out.println("Apply flow error: " + e.getMessage());
-//            return new ApplicationResult(username, title, company, jobUrl, null,
-//                    Status.FAILED, "Flow error: " + truncate(e.getMessage(), 120));
-//        }
-//    }
-//
-//    // ─────────────────────────────────────────────────────────────────────────
-//    // Close every tab except mainWindow, then switch back to mainWindow.
-//    // Completely silent — never throws.
-//    // ─────────────────────────────────────────────────────────────────────────
-//    private void safeCleanupTabs(WebDriver driver, String mainWindow) {
-//        try {
-//            Set<String> handles = driver.getWindowHandles();
-//            for (String tab : new ArrayList<>(handles)) {
-//                if (!tab.equals(mainWindow)) {
-//                    try {
-//                        driver.switchTo().window(tab);
-//                        driver.close();
-//                    } catch (Exception ignored) {
-//                        // Tab already closed or session issue — skip it
-//                    }
-//                }
-//            }
-//        } catch (Exception ignored) {
-//            // getWindowHandles() itself failed — session may be gone
-//        }
-//        // Always try to land on mainWindow
-//        try { driver.switchTo().window(mainWindow); }
-//        catch (Exception ignored) {}
-//    }
-//
-//    // ─────────────────────────────────────────────────────────────────────────
-//    // Quick session health check — returns false if session is truly dead
-//    // ─────────────────────────────────────────────────────────────────────────
-//    private boolean isSessionAlive(WebDriver driver) {
-//        try {
-//            driver.getWindowHandles(); // lightest possible Selenium call
-//            return true;
-//        } catch (Exception e) {
-//            return false;
-//        }
-//    }
-//
-//    // ─────────────────────────────────────────────────────────────────────────
-//    private String extractCompany(WebDriver driver) {
-//        String[] selectors = {
-//                ".jd-header-comp-name a", "[class*='comp-name']",
-//                ".company-name", ".orgName", "[class*='companyName']"
-//        };
-//        for (String sel : selectors) {
-//            try {
-//                List<WebElement> els = driver.findElements(By.cssSelector(sel));
-//                if (!els.isEmpty()) {
-//                    String text = els.get(0).getText().trim();
-//                    if (!text.isBlank()) return text;
-//                }
-//            } catch (Exception ignored) {}
-//        }
-//        return "Unknown";
-//    }
-//
-//    private boolean matchesRole(String title, String roleFilter) {
-//        String[] parts = roleFilter.split("[\\s-]+");
-//        for (String p : parts) { if (p.length() > 2 && title.contains(p)) return true; }
-//        return false;
-//    }
-//
-//    private String truncate(String s, int max) {
-//        if (s == null) return "";
-//        return s.length() > max ? s.substring(0, max) + "…" : s;
-//    }
-//
-//    private void login(WebDriver driver, UserProfile profile) throws InterruptedException {
-//        driver.get("https://www.naukri.com/nlogin/login");
-//        Thread.sleep(2000);
-//        driver.findElement(By.id("usernameField")).sendKeys(profile.getNaukriEmail());
-//        driver.findElement(By.id("passwordField")).sendKeys(profile.getNaukriPassword());
-//        driver.findElement(By.xpath("//button[text()='Login']")).click();
-//        Thread.sleep(4000);
-//        System.out.println("Login done: " + profile.getNaukriEmail());
-//    }
-//
-//    private boolean goToNextPage(WebDriver driver, JavascriptExecutor js, int cur) {
-//        int next = cur + 1;
-//        String[] xpaths = {
-//                "//a[normalize-space(text())='" + next + "']",
-//                "//a[@data-page='" + next + "']",
-//                "//*[contains(@class,'pagination')]//a[normalize-space(text())='" + next + "']",
-//                "//a[contains(@class,'next') or normalize-space(text())='Next' or @aria-label='Next page']"
-//        };
-//        for (String xp : xpaths) {
-//            try {
-//                WebElement b = driver.findElement(By.xpath(xp));
-//                js.executeScript("arguments[0].click();", b);
-//                return true;
-//            } catch (NoSuchElementException ignored) {}
-//        }
-//        return false;
-//    }
-//}
-
-
-
 package com.Job.applybot.bot;
 
 import com.Job.applybot.Driver.DriverFactory;
@@ -582,125 +27,108 @@ public class Bot {
             System.out.println("=== MODE: SEARCH — " + url + " ===");
             processSearchPages(driver, tracker, profile, url);
             if (profile.isIncludeRecommended()) {
-                System.out.println("=== ALSO PROCESSING: RECOMMENDED JOBS ===");
+                System.out.println("=== ALSO: RECOMMENDED JOBS ===");
                 processRecommendedPage(driver, tracker, profile);
             }
         }
 
         tracker.finish();
-
-        // ── COMPLETION NOTIFICATION ───────────────────────────────────────────
-        long success  = tracker.countByStatus("SUCCESS");
-        long direct   = tracker.countByStatus("DIRECT_APPLY");
-        long failed   = tracker.countByStatus("FAILED");
-        long skipped  = tracker.countByStatus("SKIPPED");
-        long redir    = tracker.countByStatus("REDIRECTED");
-        long total    = success + direct + failed + skipped + redir;
-
-        System.out.println("\n╔══════════════════════════════════════════╗");
-        System.out.println("║          APPLYBOT — RUN COMPLETE         ║");
-        System.out.println("╠══════════════════════════════════════════╣");
-        System.out.printf( "║  Total processed   : %-20d  ║%n", total);
-        System.out.printf( "║  Applied (chatbot) : %-20d  ║%n", success);
-        System.out.printf( "║  Applied (direct)  : %-20d  ║%n", direct);
-        System.out.printf( "║  Failed            : %-20d  ║%n", failed);
-        System.out.printf( "║  Skipped           : %-20d  ║%n", skipped);
-        System.out.printf( "║  Redirected        : %-20d  ║%n", redir);
-        System.out.printf( "║  Total applied     : %-20d  ║%n", success + direct);
-        System.out.println("╠══════════════════════════════════════════╣");
-        System.out.println("║  Report: " + fitStr(tracker.getFilePath(), 34) + "  ║");
-        System.out.println("╚══════════════════════════════════════════╝\n");
+        printSummary(tracker);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // RECOMMENDED JOBS — naukri.com/recommendedjobs
+    // RECOMMENDED JOBS
     //
-    // Naukri's recommended page renders job cards differently from search.
-    // We dump ALL anchor hrefs that contain "job-listings" after full scroll.
+    // Real HTML (from provided HTML document):
+    //   <article class="jobTuple bgWhite z-depth-1" data-job-id="270426501306">
+    //     <p class="title ellipsis typ-16Bold" title="Software Developer Intern">
+    //     <span class="subTitle" title="Acsys Technologies">
+    //
+    // There is NO <a href> on cards — job URL built from data-job-id.
+    // URL: https://www.naukri.com/job-listings-{data-job-id}  (Naukri resolves it)
     // ─────────────────────────────────────────────────────────────────────────
     private void processRecommendedPage(WebDriver driver, ApplicationTracker tracker,
                                         UserProfile profile) throws InterruptedException {
         driver.get(RECOMMENDED_URL);
         Thread.sleep(4000);
+        keepMinimized(driver);
 
         JavascriptExecutor js = (JavascriptExecutor) driver;
         String mainWindow     = driver.getWindowHandle();
 
-        // Scroll aggressively to trigger lazy-load of all cards
-        System.out.println("[Recommended] Scrolling to load all cards...");
+        // Scroll fully to trigger all lazy-loaded cards
+        System.out.println("[Recommended] Loading all cards...");
         long lastHeight = 0;
-        for (int attempt = 0; attempt < 15; attempt++) {
+        for (int i = 0; i < 20; i++) {
             js.executeScript("window.scrollTo(0, document.body.scrollHeight)");
-            Thread.sleep(1500);
-            long newHeight = (Long) js.executeScript("return document.body.scrollHeight");
-            if (newHeight == lastHeight) break;  // no more content loading
-            lastHeight = newHeight;
+            Thread.sleep(1200);
+            long newH = (Long) js.executeScript("return document.body.scrollHeight");
+            if (newH == lastHeight) break;
+            lastHeight = newH;
         }
-        // Scroll back to top so cards are all in DOM
         js.executeScript("window.scrollTo(0, 0)");
-        Thread.sleep(1000);
+        Thread.sleep(800);
 
-        // ── Collect job links using every known Naukri pattern ────────────────
-        List<String> hrefs  = new ArrayList<>();
-        List<String> titles = new ArrayList<>();
+        // Extract job data via JS — reads data-job-id + title from each article
+        @SuppressWarnings("unchecked")
+        List<List<String>> extracted = (List<List<String>>) js.executeScript(
+                "var r = [];" +
+                        "document.querySelectorAll('article.jobTuple[data-job-id]').forEach(function(a) {" +
+                        "  var id = a.getAttribute('data-job-id'); if (!id) return;" +
+                        "  var tp = a.querySelector('p.title[title]');" +
+                        "  var t  = tp ? tp.getAttribute('title') : '';" +
+                        "  if (!t) { tp = a.querySelector('p.title'); t = tp ? tp.textContent.trim() : 'Unknown'; }" +
+                        "  var cp = a.querySelector('span.subTitle[title]');" +
+                        "  var c  = cp ? cp.getAttribute('title') : 'Unknown';" +
+                        "  r.push([id, t, c]);" +
+                        "}); return r;"
+        );
 
-        // Try all selectors — recommended page has changed class names over time
-        String[][] strategies = {
-                // selector,  title-attr-or-text
-                { "a.title[href*='job-listings']",              "text" },
-                { "a[title][href*='job-listings']",             "title" },
-                { "a[href*='job-listings'].jobTitle",           "text" },
-                { "a[href*='job-listings'][class*='title']",    "text" },
-                { "a[href*='job-listings'][class*='Title']",    "text" },
-                { "a[href*='job-listings'][class*='jobTitle']", "text" },
-                { "a[href*='job-listings']",                    "text" },  // broadest fallback
-        };
+        List<String> hrefs    = new ArrayList<>();
+        List<String> titles   = new ArrayList<>();
+        List<String> companies= new ArrayList<>();
 
-        for (String[] s : strategies) {
-            List<WebElement> els = driver.findElements(By.cssSelector(s[0]));
-            if (!els.isEmpty()) {
-                debug("Recommended: selector [" + s[0] + "] found " + els.size() + " elements");
-                for (WebElement el : els) {
-                    try {
-                        String href  = el.getAttribute("href");
-                        String title = "title".equals(s[1])
-                                ? el.getAttribute("title")
-                                : el.getText().trim();
-                        if (href  == null || href.isBlank())  continue;
-                        if (hrefs.contains(href))             continue;  // dedup
-                        hrefs.add(href);
-                        titles.add(title != null ? title.toLowerCase() : "unknown");
-                    } catch (Exception ignored) {}
+        if (extracted != null) {
+            for (List<String> item : extracted) {
+                if (item == null || item.isEmpty()) continue;
+                String jobId   = item.get(0);
+                String title   = item.size() > 1 ? item.get(1) : "Unknown";
+                String company = item.size() > 2 ? item.get(2) : "Unknown";
+                if (jobId == null || jobId.isBlank()) continue;
+                String href = "https://www.naukri.com/job-listings-" + jobId;
+                if (!hrefs.contains(href)) {
+                    hrefs.add(href);
+                    titles.add(title.toLowerCase());
+                    companies.add(company);
                 }
-                if (!hrefs.isEmpty()) break;  // found jobs — stop trying
             }
         }
 
-        // Last-resort: extract via JS to pierce any shadow DOM or React hydration
+        // Fallback: any visible <a href*=job-listings>
         if (hrefs.isEmpty()) {
-            debug("Recommended: trying JS extraction...");
-            @SuppressWarnings("unchecked")
-            List<String> jsLinks = (List<String>) js.executeScript(
-                    "return Array.from(document.querySelectorAll('a[href]'))" +
-                            "  .map(a => a.href)" +
-                            "  .filter(h => h.includes('job-listings'));"
-            );
-            if (jsLinks != null) {
-                for (String href : jsLinks) {
-                    if (!hrefs.contains(href)) { hrefs.add(href); titles.add("unknown"); }
-                }
+            System.out.println("[Recommended] No articles via JS — trying anchor fallback");
+            for (WebElement a : driver.findElements(By.cssSelector("a[href*='job-listings']"))) {
+                try {
+                    String href = a.getAttribute("href");
+                    if (href == null || href.isBlank() || hrefs.contains(href)) continue;
+                    hrefs.add(href);
+                    String t = a.getAttribute("title");
+                    if (t == null || t.isBlank()) t = a.getText().trim();
+                    titles.add((t != null ? t : "Unknown").toLowerCase());
+                    companies.add("Unknown");
+                } catch (Exception ignored) {}
             }
         }
 
         System.out.println("[Recommended] Jobs found: " + hrefs.size());
-
         if (hrefs.isEmpty()) {
-            debug("Recommended: NO jobs found. Dumping page state for diagnosis...");
-            dumpPageState(driver, js);
+            System.out.println("[DEBUG] URL: " + driver.getCurrentUrl());
+            System.out.println("[DEBUG] article.jobTuple count: "
+                    + driver.findElements(By.cssSelector("article.jobTuple")).size());
             return;
         }
 
-        processJobList(driver, js, mainWindow, hrefs, titles, profile, tracker);
+        processJobList(driver, js, mainWindow, hrefs, titles, companies, profile, tracker);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -712,50 +140,54 @@ public class Bot {
 
         driver.get(startUrl);
         Thread.sleep(3000);
+        keepMinimized(driver);
 
         JavascriptExecutor js = (JavascriptExecutor) driver;
         String mainWindow     = driver.getWindowHandle();
         int page              = 1;
         int maxPages          = profile.getMaxPages() > 0 ? profile.getMaxPages() : 10;
-        String prevPageUrl    = "";  // used to detect if pagination actually moved
+        String prevUrl        = "";
 
         while (page <= maxPages) {
             System.out.println("===== PAGE " + page + " =====");
 
+            // Scroll to load all job cards
             for (int i = 0; i < 3; i++) {
-                js.executeScript("window.scrollBy(0,1000)");
-                Thread.sleep(1000);
+                js.executeScript("window.scrollBy(0, 1000)");
+                Thread.sleep(800);
             }
 
-            List<String> hrefs  = collectSearchLinks(driver);
-            List<String> titles = collectSearchTitles(driver);
+            List<String> hrefs    = new ArrayList<>();
+            List<String> titles   = new ArrayList<>();
+            List<String> companies= new ArrayList<>();
+            collectSearchJobs(driver, hrefs, titles, companies);
 
             if (hrefs.isEmpty()) {
-                System.out.println("No jobs found on page " + page + " — stopping pagination.");
+                System.out.println("No jobs on page " + page + " — stopping.");
                 break;
             }
             System.out.println("Found " + hrefs.size() + " jobs on page " + page);
 
-            processJobList(driver, js, mainWindow, hrefs, titles, profile, tracker);
+            processJobList(driver, js, mainWindow, hrefs, titles, companies, profile, tracker);
 
-            // ── PAGINATION ────────────────────────────────────────────────────
-            String currentUrl = driver.getCurrentUrl();
-            boolean moved     = goToNextPage(driver, js, page);
+            // ── Pagination ────────────────────────────────────────────────────
+            String urlBefore = driver.getCurrentUrl();
+            boolean clicked  = goToNextPage(driver, js, page, urlBefore);
 
-            if (!moved) {
-                System.out.println("No page " + (page + 1) + " — end of search results.");
+            if (!clicked) {
+                System.out.println("[Pagination] No next page found — done.");
                 break;
             }
 
             Thread.sleep(3000);
 
-            // Verify the URL actually changed — prevents infinite loop on same page
-            String newUrl = driver.getCurrentUrl();
-            if (newUrl.equals(currentUrl) || newUrl.equals(prevPageUrl)) {
-                System.out.println("Pagination did not navigate to a new page — stopping.");
+            // Verify URL actually changed to avoid infinite loop
+            String urlAfter = driver.getCurrentUrl();
+            if (urlAfter.equals(urlBefore) || urlAfter.equals(prevUrl)) {
+                System.out.println("[Pagination] URL unchanged — end of results.");
                 break;
             }
-            prevPageUrl = currentUrl;
+            prevUrl = urlBefore;
             page++;
 
             if (!isSessionAlive(driver)) { System.out.println("Session lost."); break; }
@@ -763,100 +195,113 @@ public class Bot {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Process a list of job hrefs
-    // Title filter is COMMENTED OUT — uncomment block below to re-enable
+    // Collect jobs from search result page
+    // ─────────────────────────────────────────────────────────────────────────
+    private void collectSearchJobs(WebDriver driver, List<String> hrefs,
+                                   List<String> titles, List<String> companies) {
+        // Primary: <a class="title" href="...job-listings...">
+        List<WebElement> anchors = driver.findElements(
+                By.xpath("//a[contains(@href,'job-listings') and contains(@class,'title')]"));
+        if (anchors.isEmpty()) {
+            anchors = driver.findElements(By.cssSelector("a[href*='job-listings']"));
+        }
+        Set<String> seen = new LinkedHashSet<>();
+        for (WebElement a : anchors) {
+            try {
+                String href = a.getAttribute("href");
+                if (href == null || href.isBlank() || !seen.add(href)) continue;
+                hrefs.add(href);
+                String t = a.getText().trim();
+                if (t.isBlank()) t = a.getAttribute("title");
+                titles.add(t != null ? t.toLowerCase() : "unknown");
+                companies.add("Unknown");
+            } catch (Exception ignored) {}
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Process a list of jobs
     // ─────────────────────────────────────────────────────────────────────────
     private void processJobList(WebDriver driver, JavascriptExecutor js,
-                                String mainWindow, List<String> hrefs, List<String> titles,
+                                String mainWindow, List<String> hrefs,
+                                List<String> titles, List<String> companies,
                                 UserProfile profile, ApplicationTracker tracker)
             throws InterruptedException {
 
         for (int i = 0; i < hrefs.size(); i++) {
-            String title = (titles.size() > i) ? titles.get(i) : "unknown";
-            String link  = hrefs.get(i);
+            String title   = i < titles.size()   ? titles.get(i)   : "unknown";
+            String link    = hrefs.get(i);
+            String company = i < companies.size() ? companies.get(i) : "Unknown";
 
-            /* ── TITLE FILTER (uncomment to enable) ───────────────────────
-            String roleFilter = profile.getRole() != null
-                    ? profile.getRole().toLowerCase().replace("-"," ") : "java";
-            if (!matchesRole(title, roleFilter)) {
-                System.out.println("Skipping (filter): " + title);
-                continue;
+            /* ── TITLE FILTER — uncomment to enable ───────────────────────────
+            String rf = profile.getRole() != null
+                    ? profile.getRole().toLowerCase().replace("-"," ") : "";
+            if (!rf.isBlank() && !matchesRole(title, rf)) {
+                System.out.println("Skipping (filter): " + title); continue;
             }
-            ─────────────────────────────────────────────────────────────── */
+            ─────────────────────────────────────────────────────────────────── */
 
             System.out.println("Processing [" + (i+1) + "/" + hrefs.size() + "]: " + title);
 
             if (!isSessionAlive(driver)) { System.out.println("Session lost."); return; }
 
-            applyAndTrack(driver, js, mainWindow, title, link, profile, tracker);
+            applyAndTrack(driver, js, mainWindow, title, link, company, profile, tracker);
             Thread.sleep(1500);
         }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Collect search-page job links (standard Naukri search result)
-    // ─────────────────────────────────────────────────────────────────────────
-    private List<String> collectSearchLinks(WebDriver driver) {
-        List<String> links = new ArrayList<>();
-        // Primary search result selector
-        List<WebElement> els = driver.findElements(
-                By.xpath("//a[contains(@href,'job-listings') and contains(@class,'title')]"));
-        if (els.isEmpty()) {
-            // Fallback
-            els = driver.findElements(By.cssSelector("a[href*='job-listings']"));
-        }
-        for (WebElement el : els) {
-            try { String h = el.getAttribute("href"); if (h!=null && !h.isBlank()) links.add(h); }
-            catch (Exception ignored) {}
-        }
-        return dedup(links);
-    }
-
-    private List<String> collectSearchTitles(WebDriver driver) {
-        List<String> titles = new ArrayList<>();
-        List<WebElement> els = driver.findElements(
-                By.xpath("//a[contains(@href,'job-listings') and contains(@class,'title')]"));
-        if (els.isEmpty()) els = driver.findElements(By.cssSelector("a[href*='job-listings']"));
-        for (WebElement el : els) {
-            try { titles.add(el.getText().toLowerCase().trim()); }
-            catch (Exception ignored) { titles.add("unknown"); }
-        }
-        return titles;
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Apply to one job — track result
+    // Open job tab, apply, track, close tab
+    // Key: re-minimize after every window operation
     // ─────────────────────────────────────────────────────────────────────────
     private void applyAndTrack(WebDriver driver, JavascriptExecutor js,
                                String mainWindow, String title, String jobUrl,
-                               UserProfile profile, ApplicationTracker tracker) {
+                               String knownCompany, UserProfile profile,
+                               ApplicationTracker tracker) {
         try {
+            // Open in background tab — do NOT switch yet
             js.executeScript("window.open(arguments[0], '_blank');", jobUrl);
-            Thread.sleep(2000);
+            Thread.sleep(1500);
 
+            // Find the new tab handle
             String jobTab = null;
-            for (String h : driver.getWindowHandles()) { if (!h.equals(mainWindow)) jobTab = h; }
+            for (String h : driver.getWindowHandles()) {
+                if (!h.equals(mainWindow)) jobTab = h;
+            }
             if (jobTab == null) {
-                tracker.add(new ApplicationResult(profile.getFullName(), title, "Unknown",
-                        jobUrl, null, Status.SKIPPED, "Tab did not open"));
+                tracker.add(new ApplicationResult(profile.getFullName(), title,
+                        knownCompany, jobUrl, null, Status.SKIPPED, "Tab did not open"));
                 return;
             }
 
+            // Switch to job tab — minimize immediately so it doesn't appear on screen
             driver.switchTo().window(jobTab);
+            keepMinimized(driver);
+
             String company = extractCompany(driver);
+            if ("Unknown".equals(company) && !knownCompany.isBlank()
+                    && !"Unknown".equals(knownCompany)) {
+                company = knownCompany;
+            }
+
             ApplicationResult result = doApply(driver, title, company, jobUrl, profile);
             tracker.add(result);
 
         } catch (Exception e) {
             System.out.println("Error on [" + title + "]: " + e.getMessage());
-            tracker.add(new ApplicationResult(profile.getFullName(), title, "Unknown",
-                    jobUrl, null, Status.FAILED,
+            tracker.add(new ApplicationResult(profile.getFullName(), title,
+                    knownCompany, jobUrl, null, Status.FAILED,
                     e.getClass().getSimpleName() + ": " + truncate(e.getMessage(), 120)));
         } finally {
             safeCleanupTabs(driver, mainWindow);
+            // After returning to main window — minimize it again
+            keepMinimized(driver);
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Core apply logic
+    // ─────────────────────────────────────────────────────────────────────────
     private ApplicationResult doApply(WebDriver driver, String title, String company,
                                       String jobUrl, UserProfile profile)
             throws InterruptedException {
@@ -886,7 +331,10 @@ public class Bot {
         System.out.println("Apply clicked.");
         Thread.sleep(3000);
 
-        // Same-tab redirect
+        // Re-minimize after click (some sites trigger window focus)
+        keepMinimized(driver);
+
+        // Same-tab redirect?
         String currentUrl = driver.getCurrentUrl();
         if (!currentUrl.contains("naukri.com")) {
             System.out.println("Redirected: " + currentUrl);
@@ -894,14 +342,18 @@ public class Bot {
                     Status.REDIRECTED, "Redirected: " + currentUrl);
         }
 
-        // External tab check
+        // External tab opened?
         String externalUrl = null, externalTab = null, jobTabHandle = null;
         for (String handle : driver.getWindowHandles()) {
             try {
                 driver.switchTo().window(handle);
+                keepMinimized(driver);
                 String tabUrl = driver.getCurrentUrl();
-                if (!tabUrl.contains("naukri.com")) { externalUrl = tabUrl; externalTab = handle; }
-                else                                 { jobTabHandle = handle; }
+                if (!tabUrl.contains("naukri.com")) {
+                    externalUrl = tabUrl; externalTab = handle;
+                } else {
+                    jobTabHandle = handle;
+                }
             } catch (Exception ignored) {}
         }
         if (externalUrl != null && !externalUrl.isBlank()) {
@@ -914,7 +366,7 @@ public class Bot {
                 try { driver.switchTo().window(jobTabHandle); } catch (Exception ignored) {}
             }
             return new ApplicationResult(username, title, company, jobUrl, externalUrl,
-                    Status.REDIRECTED, "External tab: " + externalUrl);
+                    Status.REDIRECTED, "External: " + externalUrl);
         }
         if (jobTabHandle != null) {
             try { driver.switchTo().window(jobTabHandle); } catch (Exception ignored) {}
@@ -923,6 +375,7 @@ public class Bot {
         boolean isChatBot = !driver.findElements(By.cssSelector(".chatbot_Drawer")).isEmpty();
         boolean isPopup   = !driver.findElements(
                 By.cssSelector(".apply-layer-container,.question-title")).isEmpty();
+
         try {
             if (isChatBot) {
                 System.out.println("-> ChatBot flow");
@@ -937,7 +390,7 @@ public class Bot {
             } else {
                 System.out.println("-> Direct apply");
                 return new ApplicationResult(username, title, company, jobUrl, null,
-                        Status.DIRECT_APPLY, "No questions asked");
+                        Status.DIRECT_APPLY, "No questions");
             }
         } catch (Exception e) {
             return new ApplicationResult(username, title, company, jobUrl, null,
@@ -946,59 +399,167 @@ public class Bot {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PAGINATION — fixed to prevent infinite loop
+    // PAGINATION — fixed using href pattern matching
     //
-    // Key fix: after clicking, we verify the URL changed in processSearchPages.
-    // This method only clicks — the caller checks if navigation happened.
+    // Real Naukri HTML: <a href="/java-developer-jobs-in-india-2">2</a>
+    //
+    // The WRONG approach (what was breaking): XPath text()='2' matches ANY
+    // element with text "2", including review counts, ratings, etc.
+    //
+    // The CORRECT approach: match the <a> whose href ENDS with -<pageNumber>
+    // AND whose visible text is exactly the page number.
     // ─────────────────────────────────────────────────────────────────────────
-    private boolean goToNextPage(WebDriver driver, JavascriptExecutor js, int currentPage) {
+    private boolean goToNextPage(WebDriver driver, JavascriptExecutor js,
+                                 int currentPage, String currentUrl) {
         int next = currentPage + 1;
         System.out.println("[Pagination] Looking for page " + next);
 
-        // Scroll pagination area into view first
+        // Scroll to bottom where Naukri puts pagination
+        js.executeScript("window.scrollTo(0, document.body.scrollHeight)");
+        try { Thread.sleep(600); } catch (InterruptedException ignored) {}
+
+        // ── STRATEGY 1: href ends with -{pageNumber} (most specific, least chance of wrong match)
+        // Real example: href="/java-developer-jobs-in-india-2"
         try {
-            WebElement paginationArea = driver.findElement(By.xpath(
-                    "//*[contains(@class,'pagination') or contains(@class,'page-nav') or contains(@class,'Pagination')]"));
-            js.executeScript("arguments[0].scrollIntoView({block:'center'})", paginationArea);
-            Thread.sleep(500);
+            List<WebElement> anchors = driver.findElements(By.xpath(
+                    "//a[substring(@href, string-length(@href) - " + String.valueOf(String.valueOf(next).length()) +
+                            ") = '-" + next + "' and normalize-space(text())='" + next + "']"
+            ));
+            for (WebElement el : anchors) {
+                if (el.isDisplayed()) {
+                    System.out.println("[Pagination S1] href-ends-with match: "
+                            + el.getAttribute("href"));
+                    js.executeScript("arguments[0].scrollIntoView({block:'center'})", el);
+                    Thread.sleep(300);
+                    js.executeScript("arguments[0].click()", el);
+                    return true;
+                }
+            }
         } catch (Exception ignored) {}
 
-        // Try all known patterns
-        String[] xpaths = {
-                "//a[normalize-space(text())='" + next + "']",
-                "//a[@data-page='" + next + "']",
-                "//span[normalize-space(text())='" + next + "']",
-                "//button[normalize-space(text())='" + next + "']",
-                "//*[contains(@class,'pagination')]//a[normalize-space(text())='" + next + "']",
-                "//*[contains(@class,'page')]//a[normalize-space(text())='" + next + "']",
-                "//a[contains(@class,'next') and not(contains(@class,'disabled'))]",
-                "//a[@aria-label='Next page']",
-                "//a[normalize-space(text())='Next']",
-                "//a[normalize-space(text())='>']",
-        };
+        // ── STRATEGY 2: data-page attribute (Naukri sometimes uses this)
+        try {
+            List<WebElement> els = driver.findElements(
+                    By.cssSelector("a[data-page='" + next + "']"));
+            for (WebElement el : els) {
+                if (el.isDisplayed()) {
+                    System.out.println("[Pagination S2] data-page match");
+                    js.executeScript("arguments[0].scrollIntoView({block:'center'})", el);
+                    Thread.sleep(300);
+                    js.executeScript("arguments[0].click()", el);
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {}
 
-        for (String xp : xpaths) {
-            try {
-                List<WebElement> found = driver.findElements(By.xpath(xp));
-                for (WebElement el : found) {
-                    if (el.isDisplayed()) {
+        // ── STRATEGY 3: href contains page number at end, inside a pagination container
+        try {
+            List<WebElement> els = driver.findElements(By.xpath(
+                    "//*[contains(@class,'pagination') or contains(@class,'page-nav') " +
+                            "or contains(@class,'Pagination')]" +
+                            "//a[contains(@href,'-" + next + "')]"
+            ));
+            for (WebElement el : els) {
+                if (el.isDisplayed()) {
+                    String txt = el.getText().trim();
+                    // Only click if text is the page number (not something else inside pagination)
+                    if (txt.equals(String.valueOf(next)) || txt.isBlank()) {
+                        System.out.println("[Pagination S3] pagination container match: "
+                                + el.getAttribute("href"));
                         js.executeScript("arguments[0].scrollIntoView({block:'center'})", el);
                         Thread.sleep(300);
                         js.executeScript("arguments[0].click()", el);
-                        System.out.println("[Pagination] Clicked: " + el.getText().trim()
-                                + " (xpath: " + xp.substring(0, Math.min(50, xp.length())) + ")");
                         return true;
                     }
                 }
-            } catch (Exception ignored) {}
-        }
+            }
+        } catch (Exception ignored) {}
 
-        System.out.println("[Pagination] No navigation element found for page " + next);
+        // ── STRATEGY 4: Build URL directly from current URL
+        // If current page URL is /java-developer-jobs-in-india or /java-developer-jobs-in-india-1
+        // next page is /java-developer-jobs-in-india-2
+        try {
+            String nextUrl = buildNextPageUrl(currentUrl, next);
+            if (nextUrl != null) {
+                System.out.println("[Pagination S4] URL-based navigation: " + nextUrl);
+                // Verify the page link exists before navigating
+                List<WebElement> verify = driver.findElements(
+                        By.cssSelector("a[href*='-" + next + "']"));
+                if (!verify.isEmpty()) {
+                    driver.get(nextUrl);
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // ── STRATEGY 5: Next button (aria-label or class)
+        try {
+            List<WebElement> nextBtns = driver.findElements(By.xpath(
+                    "//a[@aria-label='Next page' or @aria-label='next' " +
+                            "or contains(@class,'next-btn') or contains(@class,'pagination-next')]" +
+                            "[not(contains(@class,'disabled'))]"
+            ));
+            for (WebElement el : nextBtns) {
+                if (el.isDisplayed()) {
+                    System.out.println("[Pagination S5] Next button");
+                    js.executeScript("arguments[0].click()", el);
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // Debug output
+        System.out.println("[Pagination] Failed. Nearby page links:");
+        try {
+            List<WebElement> all = driver.findElements(By.xpath(
+                    "//a[contains(@href,'-" + next + "') or @data-page]"));
+            if (all.isEmpty()) System.out.println("  none found");
+            else for (WebElement e : all)
+                System.out.println("  text=[" + e.getText().trim()
+                        + "] href=[" + safeAttr(e,"href") + "]");
+        } catch (Exception ignored) {}
+
         return false;
     }
 
+    /**
+     * Build the next-page URL from the current URL.
+     *
+     * Examples:
+     *   /java-developer-jobs-in-chennai         → /java-developer-jobs-in-chennai-2
+     *   /java-developer-jobs-in-chennai-1       → /java-developer-jobs-in-chennai-2
+     *   /java-developer-jobs-in-chennai-2       → /java-developer-jobs-in-chennai-3
+     *   ?page=1 style URLs are handled by replacing the parameter
+     */
+    private String buildNextPageUrl(String currentUrl, int nextPage) {
+        if (currentUrl == null || currentUrl.isBlank()) return null;
+
+        // Handle ?page=N style
+        if (currentUrl.contains("?page=") || currentUrl.contains("&page=")) {
+            return currentUrl.replaceAll("[?&]page=\\d+", "")
+                    + (currentUrl.contains("?") ? "&" : "?") + "page=" + nextPage;
+        }
+
+        // Handle path-based /-N suffix (Naukri's actual pattern)
+        // Strip trailing -<digits> if present, then append -<nextPage>
+        String base = currentUrl.replaceAll("-\\d+$", "");
+        // Remove trailing slash
+        base = base.replaceAll("/$", "");
+        return base + "-" + nextPage;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
+    // keepMinimized — called after every window switch to suppress pop-ups
+    // Uses window.minimize() which moves browser to taskbar immediately.
+    // ─────────────────────────────────────────────────────────────────────────
+    private void keepMinimized(WebDriver driver) {
+        try {
+            driver.manage().window().minimize();
+        } catch (Exception ignored) {
+            // Some drivers don't support minimize() — safe to ignore
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     private void safeCleanupTabs(WebDriver driver, String mainWindow) {
         try {
@@ -1013,73 +574,49 @@ public class Bot {
     }
 
     private boolean isSessionAlive(WebDriver driver) {
-        try { driver.getWindowHandles(); return true; } catch (Exception e) { return false; }
+        try { driver.getWindowHandles(); return true; }
+        catch (Exception e) { return false; }
     }
 
     private String extractCompany(WebDriver driver) {
-        String[] selectors = {
+        String[] sels = {
                 ".jd-header-comp-name a", "[class*='comp-name']",
                 ".company-name", ".orgName", "[class*='companyName']"
         };
-        for (String sel : selectors) {
+        for (String sel : sels) {
             try {
                 List<WebElement> els = driver.findElements(By.cssSelector(sel));
                 if (!els.isEmpty()) {
-                    String text = els.get(0).getText().trim();
-                    if (!text.isBlank()) return text;
+                    String t = els.get(0).getText().trim();
+                    if (!t.isBlank()) return t;
                 }
             } catch (Exception ignored) {}
         }
         return "Unknown";
     }
 
-    // Diagnose why recommended page found 0 jobs
-    private void dumpPageState(WebDriver driver, JavascriptExecutor js) {
-        System.out.println("[DEBUG] Current URL: " + driver.getCurrentUrl());
-        System.out.println("[DEBUG] Page title: " + driver.getTitle());
-        // Count all anchors with job-listings
-        try {
-            Long count = (Long) js.executeScript(
-                    "return document.querySelectorAll('a[href*=\"job-listings\"]').length;");
-            System.out.println("[DEBUG] a[href*=job-listings] count: " + count);
-        } catch (Exception ignored) {}
-        // Print first 5 anchor hrefs
-        try {
-            @SuppressWarnings("unchecked")
-            List<String> sample = (List<String>) js.executeScript(
-                    "return Array.from(document.querySelectorAll('a[href]'))" +
-                            "  .slice(0,20).map(a=>a.href+' | '+a.className);");
-            System.out.println("[DEBUG] First 20 anchors:");
-            if (sample != null) sample.forEach(s -> System.out.println("  " + s));
-        } catch (Exception ignored) {}
+    private void printSummary(ApplicationTracker tracker) {
+        long success = tracker.countByStatus("SUCCESS");
+        long direct  = tracker.countByStatus("DIRECT_APPLY");
+        long failed  = tracker.countByStatus("FAILED");
+        long skipped = tracker.countByStatus("SKIPPED");
+        long redir   = tracker.countByStatus("REDIRECTED");
+        long total   = success + direct + failed + skipped + redir;
+
+        System.out.println("\n╔══════════════════════════════════════════╗");
+        System.out.println("║          APPLYBOT — RUN COMPLETE         ║");
+        System.out.println("╠══════════════════════════════════════════╣");
+        System.out.printf( "║  Total processed   : %-20d  ║%n", total);
+        System.out.printf( "║  Applied (chatbot) : %-20d  ║%n", success);
+        System.out.printf( "║  Applied (direct)  : %-20d  ║%n", direct);
+        System.out.printf( "║  Total applied     : %-20d  ║%n", success + direct);
+        System.out.printf( "║  Failed            : %-20d  ║%n", failed);
+        System.out.printf( "║  Skipped           : %-20d  ║%n", skipped);
+        System.out.printf( "║  Redirected        : %-20d  ║%n", redir);
+        System.out.println("╠══════════════════════════════════════════╣");
+        System.out.println("║  Report saved to ~/applybot-reports/     ║");
+        System.out.println("╚══════════════════════════════════════════╝\n");
     }
-
-    // commented-out helper — keep for when title filter is re-enabled
-    // private boolean matchesRole(String title, String roleFilter) {
-    //     String[] parts = roleFilter.split("[\\s-]+");
-    //     for (String p : parts) { if (p.length() > 2 && title.contains(p)) return true; }
-    //     return false;
-    // }
-
-    private List<String> dedup(List<String> list) {
-        List<String> result = new ArrayList<>();
-        Set<String> seen = new LinkedHashSet<>();
-        for (String s : list) { if (seen.add(s)) result.add(s); }
-        return result;
-    }
-
-    private String fitStr(String s, int len) {
-        if (s == null) return " ".repeat(len);
-        if (s.length() <= len) return s + " ".repeat(len - s.length());
-        return "..." + s.substring(s.length() - (len - 3));
-    }
-
-    private String truncate(String s, int max) {
-        if (s == null) return "";
-        return s.length() > max ? s.substring(0, max) + "…" : s;
-    }
-
-    private void debug(String msg) { System.out.println("[Bot] " + msg); }
 
     private void login(WebDriver driver, UserProfile profile) throws InterruptedException {
         driver.get("https://www.naukri.com/nlogin/login");
@@ -1088,6 +625,22 @@ public class Bot {
         driver.findElement(By.id("passwordField")).sendKeys(profile.getNaukriPassword());
         driver.findElement(By.xpath("//button[text()='Login']")).click();
         Thread.sleep(4000);
+        keepMinimized(driver);
         System.out.println("Login done: " + profile.getNaukriEmail());
+    }
+
+    // private boolean matchesRole(String title, String rf) {
+    //     for (String p : rf.split("[\\s-]+")) { if (p.length()>2 && title.contains(p)) return true; }
+    //     return false;
+    // }
+
+    private String truncate(String s, int max) {
+        if (s == null) return "";
+        return s.length() > max ? s.substring(0, max) + "…" : s;
+    }
+
+    private String safeAttr(WebElement el, String attr) {
+        try { String v = el.getAttribute(attr); return v == null ? "" : v; }
+        catch (Exception e) { return ""; }
     }
 }
